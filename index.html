@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+    <head><title>Chatting</title></head>
+    <body>
+        <div id="login">
+        <input id="usrname" placeholder="Username" type="text">
+        <input id="channel" placeholder="Channel(ex. general)" type="text">
+        <button id="login" onclick="login()">Log in</button>
+        </div>
+        <div id="logon" hidden="true">
+            <h4 id="error"></h4>
+            <button id="internewchaninfo" onclick="document.getElementById('createchannelinfo').hidden=false;document.getElementById('internewchaninfo').hidden=true">Create Channel</button>
+            <div id="createchannelinfo" hidden="true">
+                <input id="createchannelname" placeholder="Channel name">
+                <input id="createchanneldesc" placeholder="Channel description">
+                <button id="createchannel" onclick="createchannel()">Create</button>
+            </div>
+            <h1 id="channelname"></h1>
+            <h3 id="channeldesc"></h3>
+            <input id="messagefeild" placeholder="Type here to send a message">
+            <button id="send" onclick="sendmessage()">Send</button>
+            <div id="messages" style="white-space:preline"></div>
+        </div>
+        
+        <script>
+            domain="75.41.1.88:4000"
+            function sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+            async function createchannel(){
+                name=document.getElementById("createchannelname").value;
+                desc=document.getElementById("createchanneldesc").value;
+                let returnvalue=200;
+                returnvalue=await fetch(`http://${domain}/messages/${name}.json`)
+                if(returnvalue.status==404){
+                    console.log(returnvalue)
+                    file={
+                        "name":name,
+                        "description":desc,
+                        "creator":username,
+                        "messages":[]
+                    }
+                    fetch(`http://${domain}/messages/`, {
+                        "credentials": "omit",
+                        "headers": {
+                            "Accept": "*/*"
+                        },
+                        "body": JSON.stringify(file),
+                        "method": "PUT"
+                    });
+                    channel=name;
+                    loadmessages();
+                }else{
+                    document.getElementById("error").innerText="Channel already exists";
+                }
+            }
+            async function login(){
+                username=document.getElementById("usrname").value;
+                channel=document.getElementById("channel").value;
+                let err;
+                let channeldata;
+                await fetch(`http://${domain}/messages/${channel}.json`)
+                .then(response=>response.json())
+                .then(data=>channeldata=data)
+                .catch(error=>err)
+                if(err==404){
+                    document.getElementById("channelname").innerHTML="INVALID CHANNEL";
+                    return;
+                }else{
+                    document.getElementById("channelname").innerText=channeldata.name;
+                    document.getElementById("channeldesc").innerText=channeldata.description;
+                }
+                document.getElementById("login").hidden=true;
+                document.getElementById("logon").hidden=false;
+                while(1){
+                    await loadmessages();
+                    await sleep(3000);
+                }
+            }
+
+            async function loadmessages(){
+                messages="";
+                await fetch(`http://${domain}/messages/${channel}.json`, {
+                    "credentials": "omit",
+                    "headers": {
+                        "Accept": "*/*",
+                        "Access-Control-Allow-Origin":true
+                    },
+                    "method": "GET"
+                }).then(response=>response.json())
+                .then(data=>{
+                    for(let i=0;i<data.messages.length;i++){
+                        messages=`| ${data.messages[i].date} | <${data.messages[i].author}> ${data.messages[i].content}\n`+messages;
+                }
+                document.getElementById("messages").innerText = messages
+                });
+            }
+            async function sendmessage(){
+                const d = new Date();
+                let date=`${d.getDate()}/${d.getMonth()}/${d.getFullYear()} ${d.getHours()}:${d.getMinutes()}.${d.getSeconds()}`
+                let message={
+                    "author":username,
+                    "date":date,
+                    "content":document.getElementById("messagefeild").value
+                }
+                fetch(`http://${domain}/channels/${channel}.json`, {
+                    "credentials": "omit",
+                    "headers": {
+                        "Accept": "*/*",
+                        "Content-Type": "application/text",
+                        "Access-Control-Allow-Origin": true
+                    },
+                    "body":JSON.stringify(message),
+                    "method": "PUT"
+                });
+                loadmessages();
+            }
+        </script>
+
+        <style>
+            * {
+                font-family:Arial, Helvetica, sans-serif;
+            }
+            #messages{
+                white-space: pre-wrap;
+                font-family: monospace;
+            }
+        </style>
+    </body>
+</html>
