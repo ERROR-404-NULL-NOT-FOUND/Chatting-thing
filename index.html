@@ -4,6 +4,7 @@
     <body>
         <div id="login">
         <input id="usrname" placeholder="Username" type="text">
+        <input id="password" placeholder="Password" type="password">
         <input id="channel" placeholder="Channel(ex. general)" type="text">
         <button id="login" onclick="login()">Log in</button>
         </div>
@@ -15,6 +16,13 @@
                 <input id="createchanneldesc" placeholder="Channel description">
                 <button id="createchannel" onclick="createchannel()">Create</button>
             </div>
+            <button id="interaccountinfo"
+                onclick="document.getElementById('createaccount').hidden=false;document.getElementById('interaccountinfo').hidden=true">Create Account</button>
+            <div id="createaccount" hidden="true">
+                <input id="createaccountname" placeholder="Username">
+                <input id="createaccountpassword" placeholder="Password" type="password">
+                <button id="createchannel" onclick="createaccount()">Create</button>
+            </div>
             <h1 id="channelname"></h1>
             <h3 id="channeldesc"></h3>
             <input id="messagefeild" placeholder="Type here to send a message">
@@ -23,7 +31,7 @@
         </div>
         
         <script>
-            domain="75.41.1.88:4000"
+            domain="./"
             function sleep(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
             }
@@ -31,7 +39,7 @@
                 name=document.getElementById("createchannelname").value;
                 desc=document.getElementById("createchanneldesc").value;
                 let returnvalue=200;
-                returnvalue=await fetch(`http://${domain}/messages/${name}.json`)
+                returnvalue=await fetch(`${domain}/messages/${name}.json`)
                 if(returnvalue.status==404){
                     console.log(returnvalue)
                     file={
@@ -40,11 +48,7 @@
                         "creator":username,
                         "messages":[]
                     }
-                    fetch(`http://${domain}/messages/`, {
-                        "credentials": "omit",
-                        "headers": {
-                            "Accept": "*/*"
-                        },
+                    fetch(`${domain}/messages/`, {
                         "body": JSON.stringify(file),
                         "method": "PUT"
                     });
@@ -54,14 +58,52 @@
                     document.getElementById("error").innerText="Channel already exists";
                 }
             }
+            function stringToHash(string) {
+
+                    var hash = 0;
+
+                    if (string.length == 0) return hash;
+
+                    for (i = 0; i < string.length; i++) {
+                        char = string.charCodeAt(i);
+                        hash = ((hash << 5) - hash) + char;
+                        hash = hash & hash;
+                    }
+
+                    return hash;
+                }
+            async function createaccount(){
+                username=document.getElementById("createaccountname").value;
+                password=stringToHash(document.getElementById("createaccountpassword").value);
+                file = {
+                    "username": username,
+                    "password": password
+                }
+                fetch(`${domain}/createaccount/createaccount.json`, {
+                    "body": JSON.stringify(file),
+                    "method": "PUT"
+                });
+            }
             async function login(){
                 username=document.getElementById("usrname").value;
+                password = stringToHash(document.getElementById("password").value);
                 channel=document.getElementById("channel").value;
                 let err;
                 let channeldata;
-                await fetch(`http://${domain}/messages/${channel}.json`)
+                await fetch(`${domain}/messages/${channel}.json`,{ "Accept": "application/json", cache: "no-store"})
                 .then(response=>response.json())
                 .then(data=>channeldata=data)
+                .then(data => {
+                        for (let i = 0; i < data.messages.length; i++) {
+                            let date=new Date(data.messages[i].date);
+                            let hours = date.getHours();
+                            let minutes = "0" + date.getMinutes();
+                            // Seconds part from the timestamp
+                            let seconds = "0" + date.getSeconds();
+                            messages = `| ${hours}:${minutes.substring(-2)}:${seconds.substring(-2)} | <${data.messages[i].author}> ${data.messages[i].content}\n` + messages;
+                        }
+                        document.getElementById("messages").innerText = messages
+                    })
                 .catch(error=>err)
                 if(err==404){
                     document.getElementById("channelname").innerHTML="INVALID CHANNEL";
@@ -80,40 +122,38 @@
 
             async function loadmessages(){
                 messages="";
-                await fetch(`http://${domain}/messages/${channel}.json`, {
-                    "credentials": "omit",
-                    "headers": {
-                        "Accept": "*/*",
-                        "Access-Control-Allow-Origin":true
-                    },
-                    "method": "GET"
+                await fetch(`${domain}/messages/${channel}.json`,{
+                    cache: "no-store",
+                    "cache": "no-cache",
+                    "Accept":"application/json"
                 }).then(response=>response.json())
                 .then(data=>{
-                    for(let i=0;i<data.messages.length;i++){
-                        messages=`| ${data.messages[i].date} | <${data.messages[i].author}> ${data.messages[i].content}\n`+messages;
-                }
+                    for (let i = 0; i < data.messages.length; i++) {
+                        let date = new Date(data.messages[i].date);
+                        let hours = date.getHours();
+                        let minutes = "0" + date.getMinutes();
+                        // Seconds part from the timestamp
+                        let seconds = "0" + date.getSeconds();
+                        messages = `| ${hours}:${minutes.substr(-2)}:${seconds.substr(-2)} | <${data.messages[i].author}> ${data.messages[i].content}\n` + messages;
+                    }
                 document.getElementById("messages").innerText = messages
                 });
             }
             async function sendmessage(){
                 const d = new Date();
-                let date=`${d.getDate()}/${d.getMonth()}/${d.getFullYear()} ${d.getHours()}:${d.getMinutes()}.${d.getSeconds()}`
+                let date=d.getTime()
                 let message={
                     "author":username,
                     "date":date,
-                    "content":document.getElementById("messagefeild").value
+                    "content":document.getElementById("messagefeild").value,
+                    "password":password,
                 }
-                fetch(`http://${domain}/channels/${channel}.json`, {
-                    "credentials": "omit",
-                    "headers": {
-                        "Accept": "*/*",
-                        "Content-Type": "application/text",
-                        "Access-Control-Allow-Origin": true
-                    },
+                fetch(`${domain}/channels/${channel}.json`, {
                     "body":JSON.stringify(message),
                     "method": "PUT"
                 });
-                loadmessages();
+                document.getElementById("messagefeild").value="";
+                await loadmessages();
             }
         </script>
 
